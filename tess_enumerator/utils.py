@@ -30,8 +30,12 @@ def as_np_dtype(bitpix: int) -> np.dtype:
 
     raise NotImplementedError(f'BITPIX[{bitpix}] not implemented')
 
-def find_data_block_count(header: fits.Header) -> int:
+def find_data_byte_size(header: fits.Header) -> int:
     if header.get('SIMPLE', False) is True:
+        return 0
+
+    # https://github.com/AstrolabeProject/imdtk/blob/devel/imdtk/core/fits_irods_helper.py#L78
+    if 0 in [header[f'NAXIS{idx}'] for idx in range(1, header['NAXIS'] + 1)]:
         return 0
 
     elif header.get('XTENSION', None) in ['IMAGE']:
@@ -42,14 +46,13 @@ def find_data_block_count(header: fits.Header) -> int:
         G: int = header['GCOUNT']
         P: int = header['PCOUNT']
         N: typing.List[int] = [header[f'NAXIS{idx}'] for idx in range(1, header['NAXIS'] + 1)]
-        # ceil(B * GCOUNT * (PCOUNT + product(N)) / FITS_BLOCK_SIZE)
         S: float = B * G * (P + np.prod(N)) / BLOCK_SIZE
-        return math.ceil(S)
+        return math.ceil(S) * BLOCK_SIZE
 
     elif header.get('XTENSION', None) in ['BINTABLE']:
         # NAXIS1 = number of bytes per row
         # NAXIS2 = number of rows in the table
-        return math.ceil(header['NAXIS1'] * header['NAXIS2'] / BLOCK_SIZE)
+        return math.ceil(header['NAXIS1'] * header['NAXIS2'] / BLOCK_SIZE) * BLOCK_SIZE
 
     elif header.get('XTENSION', None) in ['TABLE']:
         raise NotImplementedError('TABLE')
